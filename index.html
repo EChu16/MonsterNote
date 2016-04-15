@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
+    <script src="http://code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.5.2/underscore-min.js"></script>
+    <script type="text/javascript" src="http://cdnjs.cloudflare.com/ajax/libs/swfobject/2.2/swfobject.js"></script> 
+	<script src="//netdna.bootstrapcdn.com/bootstrap/3.0.0/js/bootstrap.min.js"></script>
+    <script type="text/javascript">
+		var notebook = {
+		  url: '',
+		  notes: [],
+		  idcounter: 0
+		}
+		
+		var monsterplayer;
+		var editMode = new Boolean(false);
+		var object;
+		var lastVideo = "";
+	/*    notebook = {
+		  url: '',
+		  notes: [
+		  {
+			timestamp: number
+			note: ''
+		  }
+		  ]
+		}
+	*/
+		function initialize()
+		{
+			var params = { allowScriptAccess: "always" };
+			var atts = { id: "monsterplayer" };
+
+			// Loading video
+			function loadVideo()
+			{
+				notebook.url = $('#link-input').val()
+				if(lastVideo!=notebook.url)
+				{
+					clearNotes();
+					var linkParts = notebook.url.split('v=');
+					var videoID = linkParts[1];
+					var videoLink = "http://www.youtube.com/v/" + videoID + "?enablejsapi=1&version=3&playerapiid=monsterplayer";
+					swfobject.embedSWF(videoLink, "monsterplayer", "550", "420", "8", null, null, params, atts);
+					lastVideo = notebook.url;
+				}
+				else return;
+			}
+
+			$("#link-submit-button").click(loadVideo);
+			
+			//Remove all notes
+			function clearNotes()
+			{
+				notebook.notes.splice(0);
+				renderHTML();
+			}
+			//Move to specified time
+			function moveToTime(evt)
+			{
+				var target = $(evt.currentTarget);
+				monsterplayer.seekTo(target.data('timestamp'),true);
+			}
+			
+			//Update Notes
+			function updateNumNotes()
+			{
+				$('#num-of-notes').html(notebook.notes.length);
+			}
+			// Inserting Notes
+			function insertNote()
+			{
+				if(editMode==false)
+				{
+					if(monsterplayer==null)
+					{
+						alert("Insert video link first");
+						return; 
+					}
+					if($('#note-textbox').val()=="")
+						return;
+					newNote ={
+								note: $('#note-textbox').val(),
+								timestamp: monsterplayer.getCurrentTime(),
+								id: notebook.idcounter
+							 }
+					notebook.idcounter++;
+					notebook.notes.push(newNote);
+					$('#note-textbox').val("");
+					renderHTML();
+				}
+				else updateNote(object,$('#note-textbox').val());
+			}
+
+			$("#insert-note-button").click(insertNote);
+			
+			// Removing notes
+			function removeNote(evt)
+			{
+				var target = $(evt.currentTarget);
+				notebook.notes = _.without(notebook.notes,_.findWhere(notebook.notes, {id:target.data('id')}));
+				renderHTML();
+			}
+			
+			//Edit notes
+			function editNote(evt)
+			{
+				var target = $(evt.currentTarget);
+				object = _.findWhere(notebook.notes, {id:target.data('id')});
+				note = $('#note-textbox').html();
+				if(object!=null)
+					editMode=true;
+				var updNote = target.html().split('<button');
+				$('#note-textbox').val(updNote[0]);
+			}
+			
+			//Update the note
+			function updateNote(object, note)
+			{
+				if($('#note-textbox').val()=="")
+					return;
+				object.note = note;
+				editMode = false;
+				$('#note-textbox').val("")
+				renderHTML();
+			}
+						
+			//Convert time
+			function convertSeconds(time)
+			{
+				time = parseInt(time, 10);
+				var hours   = Math.floor(time / 3600);
+				var minutes = Math.floor((time - (hours * 3600)) / 60);
+				var seconds = time - (hours * 3600) - (minutes * 60);
+
+				if (hours   < 10) {hours   = "0"+hours;}
+				if (minutes < 10 && hours ==0 ) {minutes = minutes;}
+				else if(minutes < 10) {minutes = "0"+minutes;}
+				if (seconds < 10) {seconds = "0"+seconds;}
+				if(hours!=0)
+					var timestring = hours+':'+minutes+':'+seconds;
+				else
+					var timestring = minutes+':'+seconds;
+				return timestring;
+			}
+			
+			//Displays the notes
+			function renderHTML()
+			{
+				var result = '';
+				notebook.notes = _.sortBy(notebook.notes, 'timestamp')
+				for (i = 0;i<notebook.notes.length;i++ )
+				{
+				  result 
+					+= '<div class = "row">' 
+					+ '    <div class = "col-md-2">'
+					+ '       <h4 class="move-to-time" data-timestamp='+ notebook.notes[i].timestamp +'>'
+					+ '            <span class="glyphicon glyphicon-time"></span>' + convertSeconds(notebook.notes[i].timestamp) +'</h4>'
+					+ '     </div>'
+					+ '   <div class = "col-md-9 editable-click" data-id="' + notebook.notes[i].id + '">'  + notebook.notes[i].note + '<button class="edit-button">Edit</button></div>'
+					+ '   <div class = "col-md-1 delete-entry-button" data-id="' + notebook.notes[i].id + '"> <span class = "glyphicon glyphicon-remove"></span> </div>'
+					+ '</div>'
+					+ '<hr>'
+				}
+				$('#notes-container').html(result);
+				$(".delete-entry-button").click(removeNote);
+				$(".move-to-time").click(moveToTime);
+				$(".editable-click").click(editNote);
+				$(".edit-button").click(function() { $(".edit-button").html('Edit'); $(this).html('Editting');})
+				
+				updateNumNotes();
+			}
+			
+			// Save Function
+			function copyToClipboard(text) 
+			{
+				window.prompt("Copy to clipboard: Ctrl+C, Enter", text);
+			}
+			function clickToSave()
+			{
+				copyToClipboard(JSON.stringify(notebook));
+			}
+			$("#savenotebutton").click(clickToSave);
+			$("#loadnotebutton").click(loadFromPrompt);
+			
+			// Load Function
+			function loadFromPrompt()
+			{
+				notebook_string = window.prompt("Please enter your data");
+				if (notebook_string)
+					notebook = JSON.parse(notebook_string);
+				renderHTML();
+				$('#link-input').val(notebook.url)
+				loadVideo();
+			}
+		}
+		
+		$(document).ready(initialize);
+		
+		//Initialize player object
+		function onYouTubePlayerReady(playerId)
+		{
+			monsterplayer = document.getElementById("monsterplayer");
+		}
+   </script>
+	<meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Monster Note</title>
+	<link href="bootstrap/css/bootstrap.min.css" rel="stylesheet">
+	<style>
+		#header {padding-left:10px;}
+		#EnterNote {min-width:300px;}
+		body {background-color:#C3D6F7;}
+		#LinkUrl {min-width:440px;}
+		#notes-container { height:300px; overflow:auto;}
+		.move-to-time {cursor: pointer;}
+    </style>
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+      <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+      <![endif]-->
+</head>
+<body>
+	<!-- Banner -->
+	<div class = "page-header" id = "header">
+		<img src = "monster_note.png"/>
+	</div>
+	
+	<!-- Youtube URL field with Buttons -->
+	<div class = "container-fluid">
+		<div class = "form-inline" >
+		   <div class = "form-group">
+			  <label class = "sr-only" for = "LinkUrl">URL</label>
+			  <input type = "LoadUrl" class = "form-control" id = "link-input" placeholder = "Enter Youtube Video URL">
+		  </div>
+		  <button id="link-submit-button" class="btn btn-default">
+			<span class = "glyphicon glyphicon-share-alt"></span>
+				Go
+		  </button>
+		  <button type = "SubmitNote" id="savenotebutton" class = "btn btn-default"> 
+			<span class = "glyphicon glyphicon-hand-up"></span>
+				Save
+		 </button>
+		 <button type = "SubmitNote" id="loadnotebutton" class = "btn btn-default"> 
+			<span class = "glyphicon glyphicon-hand-up"></span>
+				Load
+		 </button>
+		</div>
+		
+		<br>
+		
+		<!-- Youtube Video -->
+		<div class = "row">
+			<div class = "col-md-6">
+				<div id="monsterplayer">
+					Insert video URL. Pause video when you want to take a note.
+				</div>
+			</div>
+			
+			<!-- Notes section -->
+			<div class = "col-md-6" id = "notes"><h3> Notes <span class = "badge" id="num-of-notes">0</span></h3><br>
+				<div class = "well" id = "notes-container">
+					Notes go here
+				</div>
+				
+				<!-- Notes form box -->
+				<div class = "form-inline" >
+					<div class = "form-group">
+						<label class = "sr-only" for = "Enter Note">URL</label>
+						<textarea type = "Note" style="white-space:pre-wrap" class = "form-control" id = "note-textbox" placeholder = "Enter Note" style="width:100%"></textarea>
+					</div>
+					<button type = "SubmitNote" id="insert-note-button" class = "btn btn-default"> 
+					<span class = "glyphicon glyphicon-hand-up"></span>
+						Submit
+					</button>
+				</div>
+			</div>
+		</div>
+	</div>
+ 
+<!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+<!-- Include all compiled plugins (below), or include individual files as needed -->
+<script src="bootstrap/js/bootstrap.min.js"></script>
+</body>
+</html>

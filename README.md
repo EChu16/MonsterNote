@@ -1,1 +1,2 @@
 # MonsterNote
+<div> MonsterNote is a notetaking webapp for videos built purely on Javascript with Youtube's API. This project was built during NYCGentech Hackathon where the team consisted of Erich Chu, Nicholas Tartalagia and several mentors.</div>
